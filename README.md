@@ -69,7 +69,10 @@ Ask the AI to open files, read code, fix bugs, or create new files. The results 
 ## :rocket: Quick Start in 4 Steps
 
 ### Step 1. Download and install
-Go to the **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)** page, download the installer (`.exe`), and run it like any other Windows app.
+Go to the **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)** page and pick one of two options:
+
+- **Installer** (`Codeknife.Setup.0.1.0.exe`): run it like any other Windows app.
+- **Portable** (`Codeknife-0.1.0-win-portable.zip`): extract the zip anywhere and run `Codeknife.exe`. No installation needed.
 
 ### Step 2. Open your project folder
 Press **`Ctrl + O`** and choose your project folder. Its contents will appear in the left panel.
