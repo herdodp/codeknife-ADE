@@ -5,15 +5,15 @@
 # :knife: Codeknife
 
 ### Agentic Development Environment
-**Editor kode + asisten AI dalam satu aplikasi. Cukup minta, AI yang mengerjakan.**
+**A code editor and an AI assistant in one app. Just ask, and the AI does the work.**
 
 <br/>
 
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![Versi](https://img.shields.io/badge/Versi-0.1.0-8A2BE2?style=for-the-badge)
-![Lisensi](https://img.shields.io/badge/Lisensi-GPL--3.0-2EA44F?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.0-8A2BE2?style=for-the-badge)
+![License](https://img.shields.io/badge/License-GPL--3.0-2EA44F?style=for-the-badge)
 
-[:arrow_down: Unduh](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [:rocket: Mulai Cepat](#mulai-cepat-dalam-4-langkah) &nbsp;|&nbsp; [:speech_balloon: Contoh Perintah](#contoh-perintah-ke-ai) &nbsp;|&nbsp; [:question: Tanya Jawab](#tanya-jawab)
+[:arrow_down: Download](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [:rocket: Quick Start](#quick-start-in-4-steps) &nbsp;|&nbsp; [:speech_balloon: Example Prompts](#example-prompts) &nbsp;|&nbsp; [:question: FAQ](#faq)
 
 </div>
 
@@ -21,44 +21,44 @@
 
 ---
 
-## :sparkles: Apa itu Codeknife?
+## :sparkles: What is Codeknife?
 
-Codeknife adalah aplikasi tempat kamu menulis kode **sambil ditemani asisten AI**. Di sebelah kiri ada daftar file proyekmu, di tengah ada editor, dan di sebelah kanan ada AI yang siap diminta tolong.
+Codeknife is an app where you write code **with an AI assistant by your side**. Your project files are listed on the left, the editor sits in the middle, and the AI is ready to help on the right.
 
-Kamu tidak perlu menyalin kode bolak-balik antara browser dan editor. AI di Codeknife bisa **melihat isi proyekmu**, **membuka file**, dan **mengubah kode** langsung sesuai permintaanmu.
+No more copying code back and forth between your browser and your editor. The AI in Codeknife can **see your project**, **open files**, and **change code** directly, based on what you ask.
 
-> :bulb: Bayangkan punya rekan kerja yang duduk di sebelahmu, hafal seluruh isi proyek, dan langsung mengerjakan apa yang kamu minta.
+> :bulb: Think of a teammate sitting next to you who knows your whole project and does what you ask.
 
 <br/>
 
-## :dart: Yang Bisa Kamu Lakukan
+## :dart: What You Can Do
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-### :open_file_folder: Jelajahi Proyek
-Buka satu folder, dan seluruh isinya tampil rapi di panel kiri. Klik file mana saja untuk membukanya.
+### :open_file_folder: Explore Your Project
+Open a folder and everything inside appears neatly in the left panel. Click any file to open it.
 
 </td>
 <td width="50%" valign="top">
 
-### :pencil2: Edit dengan Nyaman
-Editor dengan tab, pewarnaan kode, dan tanda kesalahan, sama seperti editor kode profesional.
+### :pencil2: Edit Comfortably
+An editor with tabs, syntax colors, and error markers, just like a professional code editor.
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### :robot: Ngobrol dengan AI
-Panel AI ada di sebelah kanan. Pilih layanan AI favoritmu, masuk dengan akunmu, lalu mulai bertanya.
+### :robot: Chat with AI
+The AI panel is on the right. Pick your favorite AI service, sign in with your account, and start asking.
 
 </td>
 <td width="50%" valign="top">
 
-### :zap: AI yang Bekerja Langsung
-Minta AI membuka file, membaca kode, memperbaiki bug, atau membuat file baru. Hasilnya langsung terlihat di editor.
+### :zap: AI That Works Directly
+Ask the AI to open files, read code, fix bugs, or create new files. The results show up right in the editor.
 
 </td>
 </tr>
@@ -66,21 +66,21 @@ Minta AI membuka file, membaca kode, memperbaiki bug, atau membuat file baru. Ha
 
 <br/>
 
-## :rocket: Mulai Cepat dalam 4 Langkah
+## :rocket: Quick Start in 4 Steps
 
-### Langkah 1. Unduh dan pasang
-Buka halaman **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)**, unduh file pemasang (`.exe`), lalu jalankan seperti aplikasi Windows biasa.
+### Step 1. Download and install
+Go to the **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)** page, download the installer (`.exe`), and run it like any other Windows app.
 
-### Langkah 2. Buka folder proyekmu
-Tekan **`Ctrl + O`**, lalu pilih folder proyek. Isi folder akan muncul di panel kiri.
+### Step 2. Open your project folder
+Press **`Ctrl + O`** and choose your project folder. Its contents will appear in the left panel.
 
-> :pushpin: Folder terakhir yang kamu buka akan diingat. Lain kali Codeknife langsung membukanya.
+> :pushpin: Codeknife remembers the last folder you opened and reopens it next time.
 
-### Langkah 3. Pilih AI dan masuk
-Di panel kanan, pilih layanan AI yang kamu suka lalu masuk dengan akunmu.
+### Step 3. Pick an AI and sign in
+In the right panel, choose the AI service you like and sign in with your account.
 
 <details>
-<summary><b>:brain: Layanan AI yang didukung</b> (klik untuk melihat)</summary>
+<summary><b>:brain: Supported AI services</b> (click to expand)</summary>
 
 <br/>
 
@@ -92,90 +92,90 @@ Di panel kanan, pilih layanan AI yang kamu suka lalu masuk dengan akunmu.
 
 </details>
 
-### Langkah 4. Tekan **Start**
-Saat tombol Start di panel AI sudah aktif dan bertuliskan *Ready*, tekan tombolnya. AI akan terhubung ke proyekmu dan siap menerima perintah.
+### Step 4. Press **Start**
+When the Start button in the AI panel is active and says *Ready*, press it. The AI connects to your project and is ready for your requests.
 
 <br/>
 
-## :speech_balloon: Contoh Perintah ke AI
+## :speech_balloon: Example Prompts
 
-Tulis permintaanmu dengan bahasa sehari-hari. Beberapa ide:
+Write your request in everyday language. Some ideas:
 
-| Kamu ingin... | Coba ketik |
+| You want to... | Try typing |
 |---|---|
-| :book: Memahami proyek | *"Jelaskan struktur proyek ini dan fungsi tiap folder."* |
-| :page_facing_up: Membuka file | *"Buka file `renderer/app.js` di editor."* |
-| :beetle: Mencari masalah | *"Cari penyebab tombol Start tidak aktif lalu perbaiki."* |
-| :sparkles: Menambah fitur | *"Tambahkan tombol untuk menyimpan semua file sekaligus."* |
-| :broom: Merapikan | *"Rapikan penamaan variabel di file ini."* |
-| :memo: Membuat file | *"Buat file `catatan.md` berisi daftar tugas hari ini."* |
+| :book: Understand the project | *"Explain the structure of this project and what each folder does."* |
+| :page_facing_up: Open a file | *"Open `renderer/app.js` in the editor."* |
+| :beetle: Find a problem | *"Find out why the Start button is disabled and fix it."* |
+| :sparkles: Add a feature | *"Add a button to save all files at once."* |
+| :broom: Tidy up | *"Clean up the variable names in this file."* |
+| :memo: Create a file | *"Create `notes.md` with my to-do list for today."* |
 
-> :warning: Untuk perubahan besar atau penghapusan, AI akan meminta persetujuanmu dulu.
+> :warning: For big changes or deletions, the AI will ask for your approval first.
 
 <br/>
 
-## :keyboard: Pintasan Keyboard
+## :keyboard: Keyboard Shortcuts
 
-| Tombol | Fungsi |
+| Keys | Action |
 |:---:|---|
-| `Ctrl` + `O` | Buka folder proyek |
-| `Ctrl` + `S` | Simpan file yang sedang dibuka |
-| `Ctrl` + `Z` | Batalkan perubahan, termasuk perubahan dari AI |
+| `Ctrl` + `O` | Open a project folder |
+| `Ctrl` + `S` | Save the current file |
+| `Ctrl` + `Z` | Undo changes, including changes made by the AI |
 
 <br/>
 
-## :question: Tanya Jawab
+## :question: FAQ
 
 <details>
-<summary><b>Tombol Start tidak bisa ditekan, kenapa?</b></summary>
+<summary><b>Why can't I press the Start button?</b></summary>
 
 <br/>
 
-Pastikan kamu sudah membuka folder proyek dengan `Ctrl + O`. Setelah itu tunggu beberapa detik sampai statusnya berubah menjadi *Ready*.
+Make sure you have opened a project folder with `Ctrl + O`. Then wait a few seconds until the status changes to *Ready*.
 
 </details>
 
 <details>
-<summary><b>Apakah saya harus membuka file dulu sebelum memulai?</b></summary>
+<summary><b>Do I need to open a file before starting?</b></summary>
 
 <br/>
 
-Tidak. Cukup buka folder proyek. AI bisa membaca seluruh isi folder dan membuka file yang kamu minta.
+No. Just open a project folder. The AI can read everything in the folder and open any file you ask for.
 
 </details>
 
 <details>
-<summary><b>Perubahan dari AI bisa dibatalkan?</b></summary>
+<summary><b>Can I undo changes made by the AI?</b></summary>
 
 <br/>
 
-Bisa. Tekan `Ctrl + Z` di editor. Perubahan di editor juga baru tersimpan ke berkas setelah kamu menekan `Ctrl + S`.
+Yes. Press `Ctrl + Z` in the editor. Changes in the editor are only written to the file after you press `Ctrl + S`.
 
 </details>
 
 <details>
-<summary><b>Apakah tersedia untuk macOS atau Linux?</b></summary>
+<summary><b>Is it available for macOS or Linux?</b></summary>
 
 <br/>
 
-Saat ini baru tersedia untuk Windows.
+Not yet. Codeknife is currently available for Windows only.
 
 </details>
 
 <br/>
 
-## :handshake: Kontribusi dan Masukan
+## :handshake: Contributing and Feedback
 
-Menemukan masalah atau punya ide? Silakan buka [Issues](https://github.com/herdodp/codeknife-ADE/issues). Setiap masukan sangat berarti. :star: Kalau Codeknife membantumu, beri bintang di repositori ini.
+Found a problem or have an idea? Please open an [Issue](https://github.com/herdodp/codeknife-ADE/issues). Every bit of feedback helps. :star: If Codeknife helps you, give this repository a star.
 
-## :scroll: Lisensi
+## :scroll: License
 
-Codeknife dirilis dengan lisensi **GNU GPL-3.0**.
+Codeknife is released under the **GNU GPL-3.0** license.
 
 <div align="center">
 
 <br/>
 
-**Dibuat dengan :heart: untuk para pembuat kode**
+**Made with :heart: for code makers**
 
 </div>
