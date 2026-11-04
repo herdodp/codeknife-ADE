@@ -29,6 +29,12 @@ No more copying code back and forth between your browser and your editor. The AI
 
 > :bulb: Think of a teammate sitting next to you who knows your whole project and does what you ask.
 
+<div align="center">
+
+<img src="docs/screenshoot.jpeg" alt="Codeknife: project explorer on the left, editor in the middle, AI assistant on the right" width="900" />
+
+</div>
+
 <br/>
 
 ## :dart: What You Can Do
