@@ -1,0 +1,30 @@
+{
+  "name": "codeknife",
+  "version": "0.1.0",
+  "description": "Codeknife - Agentic Development Environment (ADE): Monaco editor + workspace tree + built-in Snapgent AI assistant and bridge",
+  "main": "src/main.js",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.52.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.snapgate.codeknife",
+    "productName": "Codeknife",
+    "icon": "icon.ico",
+    "files": ["src/**/*", "renderer/**/*", "extension/**/*", "package.json", "icon.png"],
+    "extraResources": [
+      { "from": "bin", "to": "bin", "filter": ["vscode_mcp.exe"] }
+    ],
+    "win": { "target": "nsis", "icon": "icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}

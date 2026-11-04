@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; worker-src 'self' blob:; connect-src 'self'">
+<title>Codeknife</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <div id="main">
+    <aside id="explorer">
+      <div class="pane-head">
+        <span id="ws-name">EXPLORER</span>
+        <span class="actions">
+          <button id="btn-new-file" title="New File">+F</button>
+          <button id="btn-new-folder" title="New Folder">+D</button>
+          <button id="btn-refresh" title="Refresh">&#8635;</button>
+          <button id="btn-open" title="Open Folder">&#128194;</button>
+        </span>
+      </div>
+      <div id="tree"></div>
+    </aside>
+    <div class="splitter" id="split-left"></div>
+    <section id="editor-pane">
+      <div id="tabs"></div>
+      <div id="review-bar" class="hidden">
+        <span id="review-msg"></span>
+        <span class="rv-actions">
+          <button id="rv-diff" title="Show / hide diff">Diff</button>
+          <button id="rv-accept" title="Keep the AI changes">Accept</button>
+          <button id="rv-reject" title="Revert to the version before the AI edits">Reject</button>
+        </span>
+      </div>
+      <div id="editor"></div>
+      <div id="diff-host" class="hidden"></div>
+      <div id="term-panel" class="hidden">
+        <div id="term-head">
+          <span>TERMINAL</span>
+          <span class="rv-actions">
+            <button id="term-stop" title="Stop the running command">Stop</button>
+            <button id="term-clear" title="Clear output">Clear</button>
+            <button id="term-close" title="Hide terminal (Ctrl+`)">&times;</button>
+          </span>
+        </div>
+        <pre id="term-out"></pre>
+        <div id="term-line"><span id="term-prompt">&gt;</span><input id="term-input" type="text" spellcheck="false" autocomplete="off" placeholder="Type a command and press Enter"></div>
+      </div>
+      <div id="welcome">
+        <h1>Codeknife</h1>
+        <p>Agentic Development Environment</p>
+        <p class="hint">Open a folder (Ctrl+O) to start. The AI assistant is on the right.</p>
+      </div>
+    </section>
+    <div class="splitter" id="split-right"></div>
+    <aside id="ai-pane">
+      <div class="pane-head">
+        <span>AI ASSISTANT</span>
+      </div>
+      <div id="ai-urlbar">
+        <button id="ai-back" title="Back">&#8592;</button>
+        <button id="ai-fwd" title="Forward">&#8594;</button>
+        <button id="ai-reload" title="Refresh">&#8635;</button>
+        <input id="ai-url" type="text" spellcheck="false" autocomplete="off" placeholder="Enter URL and press Enter">
+      </div>
+      <div id="ai-host"></div>
+    </aside>
+  </div>
+  <footer id="status">
+    <span id="st-bridge">Bridge: starting</span>
+    <span id="st-autosave" class="clickable" title="Toggle autosave (skips tabs under AI review or in conflict)">Autosave: off</span>
+    <span id="st-file"></span>
+    <span id="st-pos"></span>
+    <span id="st-lang"></span>
+  </footer>
+</div>
+<script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
