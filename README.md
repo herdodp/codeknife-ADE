@@ -2,7 +2,7 @@
 
 <img src="icon.png" alt="Codeknife" width="128" />
 
-# :knife: Codeknife
+#Codeknife
 
 ### Agentic Development Environment
 **A code editor and an AI assistant in one app. Just ask, and the AI does the work.**
@@ -13,7 +13,7 @@
 ![Version](https://img.shields.io/badge/Version-0.1.0-8A2BE2?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL--3.0-2EA44F?style=for-the-badge)
 
-[:arrow_down: Download](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [:rocket: Quick Start](#quick-start-in-4-steps) &nbsp;|&nbsp; [:speech_balloon: Example Prompts](#example-prompts) &nbsp;|&nbsp; [:question: FAQ](#faq)
+[Download](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [Quick Start](#quick-start-in-4-steps) &nbsp;|&nbsp; [Example Prompts](#example-prompts) &nbsp;|&nbsp; [FAQ](#faq)
 
 </div>
 
