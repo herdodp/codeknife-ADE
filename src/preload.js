@@ -8,9 +8,9 @@ const fs = require("fs");
 const path = require("path");
 
 const EXT = path.join(__dirname, "..", "extension");
-const VERSION = "3.9.4";
+const VERSION = "3.9.13";
 
-// hostname -> provider file (mirrors manifest.json content_scripts)
+// hostname -> provider file (kept in sync with PROVIDER_HOSTS in src/main.js)
 const PROVIDERS = {
   "chat.deepseek.com": "deepseek",
   "chatgpt.com": "chatgpt",
@@ -21,6 +21,7 @@ const PROVIDERS = {
   "kimi.ai": "kimi",
   "chat.z.ai": "glm",
   "chat.qwen.ai": "qwen",
+  "coder.qwen.ai": "qwen-coder",
   "arena.ai": "arena",
   "www.meta.ai": "meta",
   "meta.ai": "meta",
@@ -95,7 +96,7 @@ if (provider && isTop && location.protocol === "https:") {
   async function inject() {
     const css = read("overlay.css");
     if (css) { try { webFrame.insertCSS(css); } catch {} }
-    for (const rel of ["core/config.js", "core/parser.js", `providers/${provider}.js`, "core/main.js"]) {
+    for (const rel of ["core/config.js", "core/parser.js", "core/guard.js", `providers/${provider}.js`, "core/main.js"]) {
       const code = read(rel);
       if (!code) { console.error("[snapgent] missing", rel); return; }
       try { await webFrame.executeJavaScript(code); } catch (e) { console.error("[snapgent] inject failed", rel, e); return; }

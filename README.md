@@ -96,10 +96,13 @@ In the right panel, choose the AI service you like and sign in with your account
 | | | | |
 |:---:|:---:|:---:|:---:|
 | **Claude** | **ChatGPT** | **Gemini** | **DeepSeek** |
-| **Grok** | **Mistral** | **Qwen** | **Kimi** |
-| **GLM** | **Meta AI** | **Arena** | **Ptero** |
+| **Grok** | **Mistral** | **Qwen Chat** | **Qwen Coder** |
+| **Kimi** | **GLM** | **Meta AI** | **Arena** |
+| **Ptero** | | | |
 
 </details>
+
+Qwen Chat (`chat.qwen.ai`) and Qwen Coder (`coder.qwen.ai`) are separate integrations.
 
 ### Step 4. Press **Start**
 When the Start button in the AI panel is active and says *Ready*, press it. The AI connects to your project and is ready for your requests.

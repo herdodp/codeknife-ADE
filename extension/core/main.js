@@ -80,8 +80,8 @@
 
   // GitHub releases page - where users download the Bridge + start.bat.
   const GITHUB_URL = "https://github.com/herdodp/snapgent-connector";
-  // AI chat sites snapgentV3 works on. Keep in sync with manifest.json
-  // content_scripts and background.js PROVIDER_URLS when adding a provider.
+  // AI chat sites supported by this app. Keep in sync with preload.js and
+  // PROVIDER_HOSTS in src/main.js when adding a provider.
   const AI_SITES = [
     // { name: "DeepSeek", url: "https://chat.deepseek.com/" }, // hidden from UI bar (disabled, not deleted)
     { name: "ChatGPT", url: "https://chatgpt.com/" },
@@ -90,12 +90,15 @@
     { name: "Kimi", url: "https://www.kimi.ai/" },
     { name: "GLM", url: "https://chat.z.ai/" },
     { name: "Qwen", url: "https://chat.qwen.ai/" },
+    { name: "Qwen Coder", url: "https://coder.qwen.ai/" },
     { name: "Arena", url: "https://arena.ai/text/direct" },
     { name: "Meta AI", url: "https://www.meta.ai/" },
     { name: "Ptero", url: "https://ptero.pro/" },
     { name: "Grok", url: "https://grok.com/" },
     { name: "Mistral", url: "https://chat.mistral.ai/code" },
   ];
+  const FALLBACK_TURN_TEXT =
+    "ChatGPT returned an empty placeholder reply for this conversation - open a new chat and Start again.";
   const TARGET_STORAGE_KEY = "zsSelectedMcpTarget";
   let selectedTargetId = "vscode";
   try {
@@ -150,6 +153,7 @@
     // clears it - the live generation signal toggles off/on as the loop drains,
     // which otherwise made the Stop button vanish then reappear.
     stopping: false,
+    held: false,
     // userStopped: the user deliberately halted generation - via our "■ Stop"
     // button OR the site's native stop. While set, the auto-resume watchdog
     // must NOT relaunch or re-run a tool from the halted turn.
@@ -446,6 +450,11 @@
 
     while (Date.now() - lastActiveAt < TIMEOUT) {
       if (A.stop) return { kind: "stopped" };
+      if (scrollSuppressed()) {
+        lastActiveAt = Date.now();
+        await sleep(250);
+        continue;
+      }
       // NEVER let a deadline expire while the tab is in the background. A hidden
       // tab has no layout (innerText reads come back "", getBoundingClientRect is
       // 0x0) and Chrome throttles its timers, so every read here is unreliable -
@@ -621,6 +630,21 @@
       // A turn that has produced NOTHING yet is still warming up - never
       // finalize it as empty/truncated/text (a premature retry interrupts it).
       if (!sawContent) {
+        try {
+          const item = d && d.item;
+          const marker = item && item.querySelector
+            ? item.querySelector('[data-content-search-unit-key^="fallback-turn"]')
+            : null;
+          if (marker && !(d.reply || "").length) {
+            if (!warmSince) warmSince = Date.now();
+            if (Date.now() - warmSince > 2500) {
+              diag("empty.why", { branch: "fallbackTurn", rep: 0 });
+              return { kind: "fallback_turn" };
+            }
+            await sleep(200);
+            continue;
+          }
+        } catch {}
         if (!warmSince) warmSince = Date.now();
         if (Date.now() - warmSince < WARMUP_MS) { await sleep(200); continue; }
         diag("empty.why", { branch: "warmup", rep: (d.reply||"").length, lastGood: lastGoodReply.length });
@@ -948,6 +972,20 @@
       // A.stop check breaks the loop and discards this, so it just needs to be
       // a non-crashing, clearly-labelled string.
       if (!(await waitVisible()) || A.stop) return "ERROR: the command was not run - stopped by the user.";
+    }
+    if (scrollSuppressed()) {
+      diag("tool.holdScrolling", { name });
+      A.held = true;
+      ui.showStop(true);
+      let waited = false;
+      try {
+        waited = await waitScrollWindow();
+      } finally {
+        A.held = false;
+      }
+      ui.showStop(A.running || A.toolRunning || A.stopping || (A.started && P.isHardGenerating()));
+      if (!waited) return "ERROR: the command was not run - stopped by the user.";
+      diag("tool.resumeAfterScroll", { name });
     }
     // Blocked commands: refuse up-front with a clear, tailored error so the
     // model abandons it and continues instead of wasting/hanging a turn.
@@ -1368,6 +1406,11 @@
             `Timed out. Agent stopped.`);
           break;
         }
+        if (res.kind === "fallback_turn") {
+          diag("fallback_turn.end");
+          ui.banner("warn", "Conversation stopped responding", FALLBACK_TURN_TEXT);
+          break;
+        }
         // A genuinely empty turn is effectively never produced (the warm-up guard
         // waits out slow starts). It DOES happen when the site drops a reply, and
         // ending the loop silently is what made this the single most confusing
@@ -1660,6 +1703,60 @@
   // re-execution IDEMPOTENT regardless of any isGenerating/lastGenAt heuristic
   // misfire - the hard part (is this a live turn?) can be wrong without harm.
   const executed = new Map(); // "conv|turnKey" → text prefix at dispatch time
+  const SCROLL_SUPPRESS_MS = 4000;
+  let scrollSuppressUntil = 0;
+  function noteScrollUp() {
+    scrollSuppressUntil = Date.now() + SCROLL_SUPPRESS_MS;
+  }
+  const scrollSuppressed = () => Date.now() < scrollSuppressUntil;
+  const waitScrollWindow = () =>
+    ZSGuard.holdUntilScrollLapses({
+      isSuppressed: scrollSuppressed,
+      isStopped: () => !!A.stop,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      capMs: SCROLL_SUPPRESS_MS * 2 + 500,
+    });
+  function installScrollDetector() {
+    try {
+      const tracker = ZSGuard.createScrollTracker(24);
+      const inTranscript = (target) => {
+        if (!target) return false;
+        if (target === document || target === document.documentElement || target === window) return true;
+        if (!target.closest) return false;
+        if (target.closest("textarea, input, .cm-editor, [contenteditable='true']")) return false;
+        const messageSelector = P.msgSel || "[data-message-author-role]";
+        return !!(
+          target.closest(messageSelector) ||
+          target.closest("article") ||
+          (typeof target.querySelector === "function" &&
+            (target.querySelector(messageSelector) || target.querySelector("article")))
+        );
+      };
+      const scrollPosition = (target) => {
+        if (target && typeof target.scrollTop === "number" &&
+            target !== document && target !== document.documentElement) {
+          return { key: target, top: target.scrollTop };
+        }
+        return {
+          key: document.documentElement,
+          top: window.scrollY || document.documentElement.scrollTop || 0,
+        };
+      };
+      document.addEventListener("scroll", (event) => {
+        const target = event && event.target;
+        if (!inTranscript(target)) return;
+        const position = scrollPosition(target);
+        if (tracker.observe(position.key, position.top)) noteScrollUp();
+      }, { capture: true, passive: true });
+      window.addEventListener("wheel", (event) => {
+        if (!(event && event.deltaY < 0) || !inTranscript(event.target)) return;
+        noteScrollUp();
+      }, { passive: true });
+    } catch (error) {
+      console.warn("[snapgentV3] Could not install scroll guard:", error);
+    }
+  }
+  installScrollDetector();
   function rememberExecuted(item) {
     if (!item) return;
     try {
@@ -2102,6 +2199,29 @@
       // The user halted the bootstrap (our Stop or the site's native stop). Do
       // NOT declare the session ready - abort quietly so "Start" stays available.
       if (A.stop || startRes.kind === "stopped") { diag("start.aborted", { kind: startRes.kind }); return; }
+
+      if (startRes.kind === "fallback_turn") {
+        diag("start.noToolCall", { kind: startRes.kind });
+        ui.banner("warn", "Start did not complete", FALLBACK_TURN_TEXT);
+        return;
+      } else if (startRes.kind !== "tool") {
+        const kind = startRes.kind || "?";
+        const raw = String(startRes.text || startRes.raw || "");
+        diag("start.noToolCall", { kind, textLen: raw.length, head: raw.slice(0, 240) });
+        const why = {
+          empty: "reply was never read (0 chars) - message DOM not matched",
+          timeout: "no reply appeared within the timeout",
+          text: /"command"\s*:/.test(raw)
+            ? "reply has a command block the parser rejected"
+            : "model answered in prose without a command block",
+          parse_error: `command block malformed (${startRes.reason || "?"})`,
+          truncated: "reply was cut off before the command finished",
+          context_limit: "conversation hit the context limit",
+          too_long: "the message was too long for the site",
+        }[kind] || `unexpected reply kind "${kind}"`;
+        ui.banner("warn", "Start did not complete", why);
+        return;
+      }
 
       // If the model calls list_commands as instructed, run it and wait for the "ready" reply.
       const firstName = startRes.calls && startRes.calls[0] && startRes.calls[0].tool;
@@ -2764,7 +2884,7 @@
     let targetBtn, targetMenuEl;
     let cover, coverRaf, barRaf;
     let openMenuFn = null; // set by build(); lets the popup force the panel open via runtime message
-    let bridgeOk = false, workspaceReady = false, workspaceProbePending = false, workspaceProbeAt = 0;
+    let bridgeOk = false, workspaceReady = false, workspaceProbePending = false, workspaceProbeAt = 0, workspaceProbeFails = 0;
     let studioDown = false, placeDown = false, appDown = false, addonOk = false, studioProcUp = false;
     let wasConnected = false, bridgeBannerEl = null;
 
@@ -3557,16 +3677,20 @@
           setupSeen = true;
           try { chrome.storage.local.set({ zsSetupSeen: true }); } catch {}
         }
+        const probeFloor = workspaceReady === false && workspaceProbeFails > 0
+          ? Math.min(5000 * Math.pow(2, Math.min(workspaceProbeFails, 5)), 300000)
+          : 30000;
         if (selectedTargetId === "vscode" && serverConnected && !workspaceProbePending &&
-            Date.now() - workspaceProbeAt >= 5000) {
+            Date.now() - workspaceProbeAt >= probeFloor) {
           workspaceProbeAt = Date.now();
           workspaceProbePending = true;
-          ensureTools(!workspaceReady).then(() => { // not ready yet: skip the 30s cache so a tool list fetched before the folder was opened cannot keep us stuck
+          ensureTools(false).then(() => {
             const workspaceTool = activeTools().find((tool) => bareToolName(tool.name) === "list_dir");
             bridgeOk = serverConnected &&
               ((selected.tools || 0) > 0 || activeTools().length > 0);
             if (!workspaceTool) {
               workspaceReady = false;
+              workspaceProbeFails += 1;
               return;
             }
             return bg({
@@ -3576,13 +3700,14 @@
               timeout: 5000,
             }).then((result) => {
               workspaceReady = !!(result && result.ok);
+              workspaceProbeFails = workspaceReady ? 0 : workspaceProbeFails + 1;
             });
           }).catch((error) => {
             workspaceReady = false;
+            workspaceProbeFails += 1;
             console.warn("[snapgentV3] Could not verify VS Code workspace:", error);
           }).finally(() => {
             workspaceProbePending = false;
-            renderBar();
           });
         } else if (selectedTargetId === "vscode" && !serverConnected) {
           workspaceReady = false;
@@ -3710,7 +3835,7 @@
       if (!stopBtn) return;
       // Stay visible while winding down (A.stopping), so the button doesn't blink
       // off when the live generation signal toggles as the loop drains.
-      const allow = (v || A.stopping) && !A.starting;
+      const allow = (A.held || !scrollSuppressed()) && (v || A.stopping) && !A.starting;
       const was = stopBtn.hidden;
       stopBtn.hidden = !allow;
       // Restore the normal, clickable Stop look whenever we're shown for a fresh
@@ -4010,6 +4135,12 @@
 
     function inputCover(on) {
       const ed = P.getEditor();
+      if (on && scrollSuppressed()) {
+        if (cover) cover.style.display = "none";
+        if (ed) ed.classList.remove("zs-typing");
+        cancelAnimationFrame(coverRaf);
+        return;
+      }
       if (!on) {
         if (cover) { cover.style.display = "none"; cover.dataset.on = ""; }
         if (ed) ed.classList.remove("zs-typing");
@@ -4435,7 +4566,8 @@
         diag("stop.quiet"); // drain over: site quiet, Stopping… released
       }
     }
-    ui.showStop(A.running || A.toolRunning || A.stopping || (A.started && P.isHardGenerating()));
+    ui.showStop((A.held || !scrollSuppressed()) &&
+      (A.running || A.toolRunning || A.stopping || (A.started && P.isHardGenerating())));
 
     // Tool is executing on the MCP → timer on its chip.
     if (A.toolRunning && A.toolItem) {
@@ -4757,6 +4889,7 @@
     if (!A.started || A.running || A.starting || A.injecting) return;
     if (document.hidden) return;                         // AI tab not foreground → don't parse/exec off-screen (agentLoop gates too)
     if (A.userStopped) return;                          // user halted → never relaunch
+    if (scrollSuppressed()) return;
     if (P.isGenerating()) return;
     if (Date.now() - A.lastGenAt > RESUME_FRESH_MS) return; // not a fresh live turn
     const item = P.lastAssistant();

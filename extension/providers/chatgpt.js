@@ -63,7 +63,15 @@ const ZSProvider = (() => {
   let diag = () => {}; // injected by core via init()
 
   const S = {
-    msg: '[data-message-author-role],[class*="DilResponseRoot"]',
+    // 2026-11 (desktop): ChatGPT dropped BOTH data-message-author-role AND
+    // .markdown. A turn is now a [data-turn-key] container holding a user bubble
+    // ([class*="group/user-message"]) and an assistant bubble whose only stable
+    // marker is a hashed class. Measured live (Chrome 157, 13 Nov 2026):
+    // authorRole=0, DilResponseRoot=0, markdown=0, groupUser=4, turnKey=2 - which
+    // is exactly why Start reported
+    // "reply was never read (0 chars) - message DOM not matched".
+    // The structural probes are APPENDED, so older layouts keep working.
+    msg: '[data-message-author-role],[class*="DilResponseRoot"],[data-turn-key]',
     userRole: "user",
     assistantRole: "assistant",
     reply: ".markdown",
@@ -115,13 +123,81 @@ const ZSProvider = (() => {
   };
 
   // ── Turn classification ───────────────────────────────────────────────────
-  const role = (item) => (item && item.getAttribute ? item.getAttribute("data-message-author-role") : null);
-  const isUserItem = (item) => role(item) === S.userRole;
+  // 2026-11 desktop changed the message DOM, so a turn is now identified by its
+  // STRUCTURAL container instead of the removed author-role attributes:
+  //   <div data-turn-key="…">
+  //     <div …><div class="group/user-message">…user text…</div></div>
+  //     <div …><h4 class="sr-only"><span>ChatGPT said:</span></h4>…reply…</div>
+  //   </div>
+  const isTurnKeyItem = (item) => !!(item && item.matches && item.matches('[data-turn-key]'));
+  const role = (item) => {
+    const attr = item && item.getAttribute ? item.getAttribute("data-message-author-role") : null;
+    if (attr) return attr;
+    // New markup: the container itself carries the turn, the role lives inside it.
+    if (isTurnKeyItem(item)) return "turn";
+    return null;
+  };
+  // The user bubble is a DESCENDANT of the [data-turn-key] item, so the old
+  // `closest('[class*="group/user-message"]')` probe walked ANCESTORS and could
+  // never match: role() returned "turn", isAssistantItem() then claimed every
+  // turn unconditionally, and classifyText's assistant-first branch read an empty
+  // string for user turns (their text is excluded by inUser()). That silently
+  // killed, in the new layout only: the injected-feedback chip + .zs-hidden
+  // camouflage, SYS_MARKER hiding, preHideWholeItems, the sinceLastSysInDom user
+  // tally, the "next is user" fallback and landed()'s preUser check.
+  // Detect on the descendant, and treat a turn as the ASSISTANT only when it has
+  // no user bubble.
+  const turnHasUserBubble = (item) =>
+    !!(item && item.querySelector && item.querySelector('[class*="group/user-message"]'));
+  const isUserItem = (item) => {
+    if (role(item) === S.userRole) return true;
+    if (!item) return false;
+    // A bare bubble handed to us directly still reports itself.
+    if (item.closest && item.closest('[class*="group/user-message"]')) return true;
+    return isTurnKeyItem(item) && turnHasUserBubble(item);
+  };
   const isDilReply = (item) => !!(item && item.matches && item.matches('[class*="DilResponseRoot"]'));
-  const isAssistantItem = (item) => role(item) === S.assistantRole || isDilReply(item);
-  const replyNodes = (item) => isDilReply(item)
-    ? [item]
-    : [...item.querySelectorAll(S.reply)];
+  const isAssistantItem = (item) => {
+    if (role(item) === S.assistantRole || isDilReply(item)) return true;
+    // New layout: one container holds BOTH sides, so a turn is the assistant
+    // surface only if it carries no user bubble of its own.
+    return isTurnKeyItem(item) && !turnHasUserBubble(item);
+  };
+
+  // The assistant reply inside a new-style turn comes in TWO shapes, and they
+  // alternate between replies:
+  //   A) fenced code  → <div class="… zs-cmd-mask"> … <pre>{"command":…}</pre>
+  //   B) plain text   → <div class="zs-tool-hide">ChatGPT said:ChatGPTJSON{"command":…}</div>
+  //      (NO <pre> at all - measured: preAsst=0, hide=1)
+  // Reading only <pre> made the bar sit on "ChatGPT returned an empty reply"
+  // while the tool chip spun forever, because shape B yielded zero nodes.
+  // .zs-tool-hide must NEVER be excluded: the core itself uses that class to mark
+  // the block it already consumed.
+  const SR_REPLY = /^\s*(?:chatgpt\s+(?:said|dit))\s*:?\s*/i;
+  const turnAssistantBlocks = (item) => {
+    if (!isTurnKeyItem(item)) return [];
+    const inUser = (el) => !!el.closest('[class*="group/user-message"]');
+    const pres = [...item.querySelectorAll("pre")].filter(
+      (p) => !inUser(p) && /[{[]/.test(p.innerText || "")
+    );
+    if (pres.length) return pres;
+    // Shape B: plain text. Take the DEEPEST wrapper that still carries the
+    // envelope, i.e. the one whose text starts at the payload.
+    return [...item.querySelectorAll("div")]
+      .filter((d) => {
+        if (inUser(d)) return false;
+        const t = d.innerText || "";
+        if (!/\{/.test(t) || /you\s+said\s*:/i.test(t)) return false;
+        return /"(?:command|params|tool)"\s*:/.test(t);
+      })
+      .slice(-1);
+  };
+  const replyNodes = (item) => {
+    if (isDilReply(item)) return [item];
+    const native = [...item.querySelectorAll(S.reply)];
+    if (native.length) return native;
+    return turnAssistantBlocks(item);
+  };
 
   // Text extraction that can skip our own chip (and any excluded subtree).
   //
@@ -218,11 +294,99 @@ const ZSProvider = (() => {
   const SR_PREFIX = /^\s*(?:you said|vous avez dit|you wrote|tu as dit|usted dijo|du hast gesagt)\s*:?\s*/i;
   const stripSrPrefix = (t) => (t ? t.replace(SR_PREFIX, "") : t);
 
+  // Assistant turns carry the mirrored label. Shape B of the 2026-11 desktop
+  // bubble reads, verbatim:
+  //   "ChatGPT said:ChatGPTJSON{"command":"read_file","params":{"path":"…"}}"
+  // The speaker word is repeated with NO separator, and a bare language label
+  // ("JSON") sits between it and the envelope. Left in place, the parser received
+  // a payload glued behind that chrome and no command ever matched.
+  // GATED to shape B only. Stripping unconditionally mangled shape-A replies:
+  // the leading /^chatgpt/i cut a legitimate "ChatGPT ..." opening, the global
+  // speaker-word removal ate "{option} ChatGPT said" style examples, and the
+  // brace slice chopped markdown before the first "[" - and that corrupted text
+  // is exactly what feeds kind:"text" loop context. Parsing does not need it:
+  // extractToolAnywhere/CMD_KEY_RE. So strip only when the raw text actually
+  // carries the glued 2026-11 chrome.
+  // Shape B opens with the speaker word AND/OR the bare language label; both are
+  // chrome, never content. Requiring the payload directly behind them keeps
+  // ordinary prose ("Python is a language.") untouched.
+  // A BARE LANGUAGE LABEL may sit between the speaker chrome and the payload
+  // ("ChatGPT said:ChatGPTJSON{...}"). Two traps this pattern has to avoid, both
+  // present in the original and both destructive:
+  //
+  //   1. No word boundary. Without `\b`, a reply starting "Should we proceed?"
+  //      was eaten by the `sh` alternative ("ould we proceed?"), and a leading
+  //      "Text of the file follows" was consumed whole.
+  //   2. Alternation order. `sh` comes before `shell`, so "shell\nls" matched
+  //      `sh` first and became "ell\nls". Longest-first ordering fixes that.
+  //
+  // Requiring a separator after the label (colon, newline, or a payload brace)
+  // keeps ordinary prose that merely STARTS with one of these words intact.
+  const LANG_LABEL_SEQ =
+    "javascript|plaintext|python|shell|bash|json|html|text|xml|sql|lua|yaml|css|js|sh";
+  const LANG_LABEL_PREFIX = new RegExp(
+    "^\\s*(?:" + LANG_LABEL_SEQ + ")\\b\\s*(?::\\s*|\\n\\s*|(?=[{[]))",
+    "i"
+  );
+  // Detectability probe: is a bare label glued in front of the payload at all?
+  const LANG_LABEL = new RegExp("^(?:" + LANG_LABEL_SEQ + ")\\b", "i");
+  const LOOKS_GLUED = (t) => {
+    if (!t) return false;
+    // Burn the chrome in the SAME order the stripper does: speaker word, then a
+    // second glued "ChatGPT", then the bare language label (see the verbatim
+    // sample above: "ChatGPT said:ChatGPTJSON{…}"). The label pass is the same
+    // LANG_LABEL_PREFIX the stripper uses, so detection and removal can never
+    // disagree about what counts as chrome.
+    const payload = t.slice(0, 96)
+      .replace(SR_REPLY, "")
+      .replace(/^chatgpt\s*/i, "")
+      .replace(LANG_LABEL_PREFIX, "");
+    if (!/^\s*[{[]/.test(payload)) return false;
+    // Only a string that actually carried some chrome gets stripped.
+    return payload.length < t.replace(/^\s+/, "").length;
+  };
+  // Strip the 2026-11 speaker chrome from the START of a reply, and nothing else.
+  //
+  // `anything` is a BARE LANGUAGE LABEL glued in front of the payload ("ChatGPT
+  // said:ChatGPTJSON{...}"). Both belong to the reply's chrome, never to content.
+  //
+  // ANCHORED ON PURPOSE. This used to be a GLOBAL replace
+  // (/chatgpt\s+(?:said|dit)\s*:?/gi), which deleted the words from the middle of
+  // a payload too - a write_file whose content literally contained "ChatGPT
+  // said:" lost that text silently. The brace slice below had the same flaw: it
+  // cut everything before the first "{" or "[", so any prose that happened to
+  // precede a command envelope was destroyed.
+  //
+  // Takes ONE argument now; the callers used to pass two, so the second (the DOM
+  // item) was meaningless.
+  const stripAssistantSrPrefix = (t) => {
+    if (!t) return t;
+    if (!LOOKS_GLUED(t)) return t;
+    // Only the leading chrome, in the same order LOOKS_GLUED burns it. SR_REPLY
+    // is the speaker word ("ChatGPT said:" / "ChatGPT dit:"); the bare "ChatGPT"
+    // pass drops the doubled word the 2026-11 chrome repeats; the label pass
+    // removes a glued language name. All three are anchored, so a payload keeps
+    // its own text.
+    return t
+      .replace(SR_REPLY, "")
+      .replace(/^chatgpt\s*/i, "")
+      .replace(LANG_LABEL_PREFIX, "");
+  };
+
   function classifyText(item, excludeSel) {
+    // USER FIRST. In the 2026-11 layout one container holds both sides, so a
+    // turn can be user-ness and assistant-ness at once; the assistant branch
+    // reads only the reply nodes and returns "" for a user turn, which is what
+    // broke the injected-feedback / camouflage / tally logic.
+    if (isUserItem(item) && !(role(item) === S.assistantRole || isDilReply(item))) {
+      const userSel = `[class*="group/user-message"]`;
+      const bubble = isTurnKeyItem(item) ? item.querySelector(userSel) : null;
+      return stripSrPrefix(textWithout(bubble || item, excludeSel));
+    }
     if (isAssistantItem(item)) {
-      return replyNodes(item)
+      return stripAssistantSrPrefix(replyNodes(item)
         .filter((m) => !(excludeSel && m.closest(excludeSel)))
-        .map((m) => textWithout(m, excludeSel)).join("\n");
+        .map((m) => textWithout(m, excludeSel)).join("\n"));
     }
     return isUserItem(item)
       ? stripSrPrefix(textWithout(item, excludeSel))
@@ -257,8 +421,17 @@ const ZSProvider = (() => {
   // a monotonic number, so the core's numeric "old id" shortcut simply doesn't
   // apply here (Number(uuid) is NaN and that guard is skipped) - the
   // settled-history guard covers the same case provider-agnostically.
-  const itemKey = (item) =>
-    (item && item.getAttribute ? item.getAttribute("data-message-id") : null) || null;
+  // The 2026-11 turn no longer carries data-message-id (measured live: 0 turns,
+  // 0 descendants), so the key MUST come from data-turn-key. Without it itemKey
+  // returned null and core's turnKey() fell back to a POSITIONAL index, which
+  // collides as soon as scrolling changes the rendered window - the guard then
+  // misses and the resume watchdog re-fires a historical tool.
+  const itemKey = (item) => {
+    if (!item || !item.getAttribute) return null;
+    return item.getAttribute("data-turn-key")
+      || item.getAttribute("data-message-id")
+      || null;
+  };
   const lastAssistantId = () => itemKey(lastAssistant());
 
   const chatIsEmpty = () => allItems().length === 0;
@@ -403,17 +576,52 @@ const ZSProvider = (() => {
     const item = lastAssistant();
     const len = streamText(item).length;
     const now = Date.now();
+    // A swap counts as NEW OUTPUT only when the arriving turn carries MORE text
+    // than the one we were tracking (a reply grows as it streams). Scrolling just
+    // brings an arbitrary older turn into view, usually at the same or a smaller
+    // length, so the idle clock must keep running in that case. Resetting it on
+    // every swap made a scroll look like generation for GEN_IDLE_MS, which
+    // wrongly showed a Stop button and let the watchdog re-fire old commands.
     if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
+      const arrivedLonger = len > _streamMax;
+      _streamItem = item;
+      _streamMax = len;
+      if (arrivedLonger) _streamAt = now;
+      return;
     }
+    // Same turn: only genuine growth refreshes the clock (a large shrink means
+    // the site re-rendered the turn, not that it is streaming).
     if (len > _streamMax) { _streamMax = len; _streamAt = now; }
   }
   const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+
+  // A turn that already has its injected result BELOW it is settled history: it
+  // cannot be streaming, no matter what sampleStream's growth clock last saw.
+  // Scrolling renders such turns as "last assistant", and without this the bar
+  // shows a Stop control and the watchdog considers the old command live.
+  const turnSettled = (item) => {
+    if (!item) return false;
+    try {
+      const all = allItems();
+      const i = all.indexOf(item);
+      if (i < 0) return false;
+      for (let j = i + 1; j < all.length; j++) {
+        const nx = all[j];
+        if (nx === item) continue;
+        if (isUserItem(nx) && /^\s*Output of '/.test(classifyText(nx, ".zs-chip") || "")) return true;
+        if (!isUserItem(nx)) return false;
+      }
+    } catch {}
+    return false;
+  };
 
   const WEDGE_MS = 10000;
   let _stopSince = 0;
   function genActive() {
     sampleStream();
+    // Settled history is never a live generation - checked FIRST so a scroll into
+    // an old command turn can never make the bar show Stop or the watchdog fire.
+    if (turnSettled(lastAssistant())) { _stopSince = 0; return false; }
     const stop = !!stopButton();
     const now = Date.now();
     if (stop) {
@@ -964,6 +1172,10 @@ const ZSProvider = (() => {
     // Exported for test-chatgpt.js (the Node smoke test drives it against a stub
     // DOM). The core reads replies through itemText/classifyText, not this.
     textWithout,
+    // Internal helpers exposed ONLY so the Node tests can pin them down. They
+    // are pure string functions with no DOM dependency, and none of them is
+    // reachable from the core, so this does not widen the provider's surface.
+    __test: { stripAssistantSrPrefix, LOOKS_GLUED, turnSettled },
     // Vision OFF, like DeepSeek's text-only Expert tab. ChatGPT's free tier caps
     // image/file input separately from messages ("les fichiers, les images et
     // l'analyse sont indisponibles jusqu'à la réinitialisation de votre quota"),
@@ -1012,6 +1224,9 @@ const ZSProvider = (() => {
     scanError, isTooLongMsg, isBusyMsg,
     // actions
     attachImages, clearAttachments, openNewChat, conversationKey,
+    // Selector for a transcript turn, so core can tell a scroll of the
+    // conversation from a scroll of unrelated chrome (sidebar, composer).
+    msgSel: S.msg,
     installSendHooks, findToolBlockSpot,
     promptExtra: PROMPT_EXTRA,
     // ChatGPT summarises its own context aggressively and loses the "an

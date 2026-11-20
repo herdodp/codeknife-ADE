@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
+    "test": "node --test test/*.test.js",
     "dist": "electron-builder --win"
   },
   "dependencies": {
@@ -24,7 +25,8 @@
     "extraResources": [
       { "from": "bin", "to": "bin", "filter": ["vscode_mcp.exe"] }
     ],
-    "win": { "target": "nsis", "icon": "icon.ico" },
+    "win": { "target": ["nsis", "portable"], "icon": "icon.ico" },
+    "portable": { "artifactName": "Codeknife-${version}-portable.exe" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
 }
