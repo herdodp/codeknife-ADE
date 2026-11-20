@@ -10,7 +10,7 @@
 <br/>
 
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![Version](https://img.shields.io/badge/Version-0.2.0-8A2BE2?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.3.0-8A2BE2?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL--3.0-2EA44F?style=for-the-badge)
 
 [Download](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [Quick Start](#quick-start-in-4-steps) &nbsp;|&nbsp; [Example Prompts](#example-prompts) &nbsp;|&nbsp; [FAQ](#faq)
@@ -72,13 +72,31 @@ Ask the AI to open files, read code, fix bugs, or create new files. The results 
 
 <br/>
 
+## :gear: Editor and Settings
+
+Codeknife uses Monaco with tabs, syntax highlighting, find and replace, diff review, and a persistent interactive PowerShell terminal. Use **Terminal → New Terminal** or press **Ctrl+`**; the terminal accepts normal keyboard input, supports resize and Ctrl+C, and can run the active JavaScript or Python file.
+
+JavaScript/TypeScript, HTML, CSS, and JSON use Monaco's built-in language features. Python analysis is provided by bundled Pyright. Codeknife also detects these language servers from `PATH` when installed:
+
+| Languages | Required executable |
+|---|---|
+| C / C++ | `clangd` |
+| Go | `gopls` |
+| Rust | `rust-analyzer` |
+
+These external servers are not downloaded by Codeknife. Open **File → Preferences → Settings → AI & Bridge** to see which language services are available and running. Completion, hover, go-to-definition, and diagnostics are provided when a server supports them.
+
+The menus and settings follow familiar VS Code conventions, but Codeknife is not a full VS Code replacement: it does not include the VS Code extension marketplace or debugger.
+
+<br/>
+
 ## :rocket: Quick Start in 4 Steps
 
 ### Step 1. Download and install
 Go to the **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)** page and pick one of two options:
 
-- **Installer** (`Codeknife.Setup.0.2.0.exe`): run it like any other Windows app.
-- **Portable** (`Codeknife-0.2.0-portable.exe`): run it directly. No installation needed.
+- **Installer** (`Codeknife.Setup.0.3.0.exe`): run it like any other Windows app.
+- **Portable** (`Codeknife-0.3.0-portable.exe`): run it directly. No installation needed.
 
 ### Step 2. Open your project folder
 Press **`Ctrl + O`** and choose your project folder. Its contents will appear in the left panel.

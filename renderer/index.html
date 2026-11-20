@@ -5,6 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; worker-src 'self' blob:; connect-src 'self'">
 <title>Codeknife</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
 </head>
 <body>
 <div id="app">
@@ -38,13 +39,12 @@
         <div id="term-head">
           <span>TERMINAL</span>
           <span class="rv-actions">
-            <button id="term-stop" title="Stop the running command">Stop</button>
+            <button id="term-stop" title="Send Ctrl+C to the terminal">Interrupt</button>
             <button id="term-clear" title="Clear output">Clear</button>
             <button id="term-close" title="Hide terminal (Ctrl+`)">&times;</button>
           </span>
         </div>
-        <pre id="term-out"></pre>
-        <div id="term-line"><span id="term-prompt">&gt;</span><input id="term-input" type="text" spellcheck="false" autocomplete="off" placeholder="Type a command and press Enter"></div>
+        <div id="term-host"></div>
       </div>
       <div id="welcome">
         <h1>Codeknife</h1>
@@ -72,8 +72,150 @@
     <span id="st-file"></span>
     <span id="st-pos"></span>
     <span id="st-lang"></span>
+    <span id="st-lsp" title="Language server status">Language tools: starting</span>
   </footer>
 </div>
+<div id="settings-overlay" class="settings-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <section class="settings-window">
+    <header class="settings-header">
+      <div>
+        <h2 id="settings-title">Settings</h2>
+        <span>Codeknife preferences</span>
+      </div>
+      <button id="settings-close" aria-label="Close settings" title="Close (Escape)">&times;</button>
+    </header>
+    <div class="settings-searchbar">
+      <input id="settings-search" type="search" placeholder="Search settings" autocomplete="off">
+      <button id="settings-reset" title="Restore default settings">Reset</button>
+    </div>
+    <div class="settings-layout">
+      <nav id="settings-nav" aria-label="Settings categories">
+        <button class="active" data-section="editor">Text Editor</button>
+        <button data-section="workbench">Workbench</button>
+        <button data-section="bridge">AI &amp; Bridge</button>
+        <button data-section="shortcuts">Keyboard Shortcuts</button>
+        <button data-section="about">About</button>
+      </nav>
+      <div id="settings-pages">
+        <section class="settings-page" data-page="editor">
+          <h3>Text Editor</h3>
+          <div class="setting-row" data-setting-row data-search="theme color dark light appearance">
+            <label for="setting-theme"><span>Color Theme<small>Choose the editor and app appearance.</small></span></label>
+            <select id="setting-theme" data-setting="theme"><option value="dark">Dark</option><option value="light">Light</option></select>
+          </div>
+          <div class="setting-row" data-setting-row data-search="font size editor text">
+            <label for="setting-font-size"><span>Font Size<small>Editor font size in pixels.</small></span></label>
+            <input id="setting-font-size" data-setting="fontSize" type="number" min="10" max="32" step="1">
+          </div>
+          <div class="setting-row" data-setting-row data-search="tab size indentation spaces">
+            <label for="setting-tab-size"><span>Tab Size<small>Number of spaces used for a tab.</small></span></label>
+            <select id="setting-tab-size" data-setting="tabSize"><option value="2">2</option><option value="4">4</option><option value="8">8</option></select>
+          </div>
+          <div class="setting-row" data-setting-row data-search="word wrap line wrapping">
+            <label for="setting-word-wrap"><span>Word Wrap<small>Wrap long lines in the editor.</small></span></label>
+            <select id="setting-word-wrap" data-setting="wordWrap"><option value="off">Off</option><option value="on">On</option></select>
+          </div>
+          <div class="setting-row" data-setting-row data-search="minimap overview">
+            <label for="setting-minimap"><span>Minimap<small>Show a code overview beside the editor.</small></span></label>
+            <input id="setting-minimap" data-setting="minimap" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="line numbers">
+            <label for="setting-line-numbers"><span>Line Numbers<small>Show line numbers in the editor.</small></span></label>
+            <input id="setting-line-numbers" data-setting="lineNumbers" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="format on paste">
+            <label for="setting-format-paste"><span>Format On Paste<small>Format pasted text when supported by the language.</small></span></label>
+            <input id="setting-format-paste" data-setting="formatOnPaste" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="smooth scrolling">
+            <label for="setting-smooth-scroll"><span>Smooth Scrolling<small>Animate editor scrolling.</small></span></label>
+            <input id="setting-smooth-scroll" data-setting="smoothScrolling" type="checkbox">
+          </div>
+        </section>
+        <section class="settings-page hidden" data-page="workbench">
+          <h3>Workbench</h3>
+          <div class="setting-row" data-setting-row data-search="autosave save automatically">
+            <label for="setting-autosave"><span>Auto Save<small>Save edits after a short pause, except during AI review or file conflicts.</small></span></label>
+            <input id="setting-autosave" data-setting="autosave" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="explorer sidebar width">
+            <label for="setting-explorer-width"><span>Explorer Width<small>Width of the project file pane.</small></span></label>
+            <span class="setting-range"><input id="setting-explorer-width" data-setting="explorerWidth" type="range" min="140" max="600" step="10"><output></output></span>
+          </div>
+          <div class="setting-row" data-setting-row data-search="ai assistant pane width">
+            <label for="setting-ai-width"><span>AI Assistant Width<small>Width of the assistant pane.</small></span></label>
+            <span class="setting-range"><input id="setting-ai-width" data-setting="aiPaneWidth" type="range" min="260" max="700" step="10"><output></output></span>
+          </div>
+          <div class="setting-row" data-setting-row data-search="terminal panel height">
+            <label for="setting-terminal-height"><span>Terminal Height<small>Height of the integrated command panel.</small></span></label>
+            <span class="setting-range"><input id="setting-terminal-height" data-setting="terminalHeight" type="range" min="140" max="600" step="10"><output></output></span>
+          </div>
+          <div class="setting-row" data-setting-row data-search="show terminal on startup">
+            <label for="setting-terminal-startup"><span>Show Terminal On Startup<small>Open the terminal panel when Codeknife starts.</small></span></label>
+            <input id="setting-terminal-startup" data-setting="terminalOnStartup" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="show ai assistant pane startup">
+            <label for="setting-ai-startup"><span>Show AI Assistant<small>Keep the assistant pane visible.</small></span></label>
+            <input id="setting-ai-startup" data-setting="showAiPane" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="show explorer sidebar">
+            <label for="setting-explorer"><span>Show Explorer<small>Keep the workspace file pane visible.</small></span></label>
+            <input id="setting-explorer" data-setting="showExplorer" type="checkbox">
+          </div>
+          <div class="setting-row" data-setting-row data-search="status bar show hide">
+            <label for="setting-status-bar"><span>Show Status Bar<small>Show bridge status, autosave, file and cursor information.</small></span></label>
+            <input id="setting-status-bar" data-setting="showStatusBar" type="checkbox">
+          </div>
+        </section>
+        <section class="settings-page hidden" data-page="bridge">
+          <h3>AI &amp; Bridge</h3>
+          <p class="settings-note">AI sign-in and model preferences are managed by the selected AI service. MCP tools run through Codeknife's in-process stdio bridge.</p>
+          <div class="setting-row" data-setting-row data-search="language support python pyright clangd c cpp go gopls rust rust-analyzer">
+            <span><strong>Language Support</strong><small>Monaco built-ins, bundled Pyright, and external language servers found on PATH.</small></span>
+          </div>
+          <div id="language-status" class="language-status" aria-live="polite"></div>
+          <div class="setting-row" data-setting-row data-search="restart mcp bridge">
+            <span><strong>Restart MCP Bridge</strong><small>Reconnect Codeknife to its configured MCP server.</small></span>
+            <button id="settings-restart-bridge">Restart</button>
+          </div>
+        </section>
+        <section class="settings-page hidden" data-page="shortcuts">
+          <h3>Keyboard Shortcuts</h3>
+          <div class="setting-row" data-setting-row data-search="open folder ctrl o">
+            <span>Open Folder</span><kbd>Ctrl+O</kbd>
+          </div>
+          <div class="setting-row" data-setting-row data-search="save ctrl s">
+            <span>Save</span><kbd>Ctrl+S</kbd>
+          </div>
+          <div class="setting-row" data-setting-row data-search="find ctrl f">
+            <span>Find</span><kbd>Ctrl+F</kbd>
+          </div>
+          <div class="setting-row" data-setting-row data-search="replace ctrl h">
+            <span>Replace</span><kbd>Ctrl+H</kbd>
+          </div>
+          <div class="setting-row" data-setting-row data-search="settings ctrl comma">
+            <span>Settings</span><kbd>Ctrl+,</kbd>
+          </div>
+          <div class="setting-row" data-setting-row data-search="terminal ctrl backtick">
+            <span>Toggle Terminal</span><kbd>Ctrl+`</kbd>
+          </div>
+          <div class="setting-row" data-setting-row data-search="command palette f1">
+            <span>Command Palette</span><kbd>F1</kbd>
+          </div>
+        </section>
+        <section class="settings-page hidden" data-page="about">
+          <h3>About Codeknife</h3>
+          <p class="settings-note">Codeknife is an Agentic Development Environment with a Monaco editor and an integrated AI assistant.</p>
+          <p class="settings-note">The editor includes an interactive PowerShell terminal, bundled Python analysis via Pyright, and optional clangd, gopls, and rust-analyzer integration. The VS Code extension marketplace and debugger are not included.</p>
+          <button id="settings-docs">Open Codeknife documentation</button>
+        </section>
+        <div id="settings-empty" class="hidden">No settings match your search.</div>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+<script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
 <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
 <script src="app.js"></script>
 </body>

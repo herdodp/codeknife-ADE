@@ -5,8 +5,9 @@
 const { app, BrowserWindow, BrowserView, ipcMain, dialog, session, Menu, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const pty = require("node-pty");
 const { BridgeCore, VERSION } = require("./bridge-core");
+const { LanguageServiceManager } = require("./language-service");
 
 const START_URL = "https://claude.ai/";
 const IGNORED_DIRS = new Set([".git", "node_modules", "dist", "build-tmp", "__pycache__", ".venv"]);
@@ -124,6 +125,16 @@ const EDITOR_TOOLS = {
 };
 
 const core = new BridgeCore({ log: logLine, onChange: () => broadcastStatus(), builtins: EDITOR_TOOLS });
+const languageServices = new LanguageServiceManager({
+  app,
+  log: logLine,
+  onStatus: (status) => {
+    if (win && !win.isDestroyed()) win.webContents.send("lsp:status", status);
+  },
+  onDiagnostics: (diagnostics) => {
+    if (win && !win.isDestroyed()) win.webContents.send("lsp:diagnostics", diagnostics);
+  },
+});
 
 function statusObj() {
   return {
@@ -262,30 +273,104 @@ ipcMain.handle("fs:delete", guard(async (rel) => {
 }));
 ipcMain.handle("fs:reveal", guard(async (rel) => { shell.showItemInFolder(safePath(rel)); return {}; }));
 
-// ---------------------------------------------------------------- terminal panel (user-typed commands, renderer-only)
+// ---------------------------------------------------------------- integrated PTY terminal
 let termProc = null;
+let termIsPowerShell = false;
 function termSend(channel, payload) { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); }
-function termKill() {
-  const p = termProc;
-  if (!p) return;
-  try {
-    if (process.platform === "win32") spawn("taskkill", ["/pid", String(p.pid), "/T", "/F"], { windowsHide: true });
-    else p.kill("SIGTERM");
-  } catch (e) { logLine("term kill failed: " + e); }
+function terminalShell() {
+  const windowsPowerShell = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  if (fs.existsSync(windowsPowerShell)) return { command: windowsPowerShell, args: ["-NoLogo"], powershell: true };
+  if (process.env.ComSpec && fs.existsSync(process.env.ComSpec)) {
+    return { command: process.env.ComSpec, args: [], powershell: false };
+  }
+  throw new Error("No supported terminal shell was found.");
 }
-ipcMain.handle("term:run", guard(async (cmd) => {
-  if (!workspace) throw new Error("No folder is open.");
-  if (typeof cmd !== "string" || !cmd.trim()) throw new Error("Empty command.");
-  if (termProc) throw new Error("A command is already running. Stop it first.");
-  const proc = spawn(cmd, { shell: true, cwd: workspace, windowsHide: true });
-  termProc = proc;
-  proc.stdout.on("data", (d) => termSend("term:data", d.toString("utf-8")));
-  proc.stderr.on("data", (d) => termSend("term:data", d.toString("utf-8")));
-  proc.on("error", (e) => { if (termProc === proc) termProc = null; termSend("term:data", "\n[error] " + String((e && e.message) || e) + "\n"); termSend("term:exit", -1); });
-  proc.on("close", (code) => { if (termProc === proc) termProc = null; termSend("term:exit", code); });
+function openTerminal(cols, rows) {
+  if (termProc) return { shell: termProc.process, cwd: workspace || app.getPath("home") };
+  const shellConfig = terminalShell();
+  const cwd = workspace || app.getPath("home");
+  termProc = pty.spawn(shellConfig.command, shellConfig.args, {
+    name: "xterm-256color",
+    cols: Math.max(2, Math.min(500, Number(cols) || 80)),
+    rows: Math.max(2, Math.min(300, Number(rows) || 24)),
+    cwd,
+    env: { ...process.env, TERM: "xterm-256color" },
+    // WinPTY avoids ConPTY's console-list helper failing for a GUI parent.
+    useConpty: false,
+  });
+  termIsPowerShell = shellConfig.powershell;
+  const proc = termProc;
+  proc.onData((data) => termSend("term:data", data));
+  proc.onExit((result) => {
+    if (termProc === proc) termProc = null;
+    termSend("term:exit", result);
+  });
+  return { shell: shellConfig.command, cwd };
+}
+function closeTerminal() {
+  if (!termProc) return;
+  const proc = termProc;
+  termProc = null;
+  try { proc.kill(); }
+  catch (error) { logLine("terminal close failed: " + (error.message || error)); }
+}
+function powershellQuote(value) { return "'" + String(value).replace(/'/g, "''") + "'"; }
+ipcMain.handle("term:open", guard(async (size) => openTerminal(size && size.cols, size && size.rows)));
+ipcMain.on("term:input", (e, data) => {
+  if (!trustedRenderer(e) || !termProc || typeof data !== "string") return;
+  if (data.length > 1024 * 1024) {
+    termSend("term:data", "\r\n[terminal input exceeded 1 MB]\r\n");
+    return;
+  }
+  termProc.write(data);
+});
+ipcMain.on("term:resize", (e, size) => {
+  if (!trustedRenderer(e) || !termProc || !size) return;
+  const cols = Number(size.cols), rows = Number(size.rows);
+  if (Number.isInteger(cols) && Number.isInteger(rows) && cols >= 2 && cols <= 500 && rows >= 2 && rows <= 300) {
+    termProc.resize(cols, rows);
+  }
+});
+ipcMain.handle("term:run-file", guard(async (rel) => {
+  const abs = safePath(rel);
+  const ext = path.extname(abs).toLowerCase();
+  const command = [".js", ".mjs", ".cjs"].includes(ext) ? "node" : ext === ".py" ? "python" : "";
+  if (!command) throw new Error("Run Active File supports JavaScript and Python files.");
+  if (!termProc) openTerminal(80, 24);
+  if (!termIsPowerShell) throw new Error("Run Active File requires PowerShell.");
+  termProc.write(`& ${powershellQuote(command)} ${powershellQuote(abs)}\r`);
   return {};
 }));
-ipcMain.handle("term:kill", (e) => { if (trustedRenderer(e)) termKill(); return true; });
+ipcMain.handle("term:interrupt", (e) => {
+  if (trustedRenderer(e) && termProc) termProc.write("\x03");
+  return true;
+});
+ipcMain.handle("term:close", (e) => {
+  if (trustedRenderer(e)) closeTerminal();
+  return true;
+});
+
+// ---------------------------------------------------------------- language servers
+function languageHandler(fn) {
+  return async (e, ...args) => {
+    if (!trustedRenderer(e)) return { ok: false, error: "untrusted sender" };
+    try { return await fn(...args); }
+    catch (error) {
+      const message = String((error && error.message) || error);
+      logLine("language service request failed: " + message);
+      return { ok: false, error: message };
+    }
+  };
+}
+ipcMain.handle("lsp:open", languageHandler((doc) => languageServices.openDocument(doc)));
+ipcMain.handle("lsp:change", languageHandler((doc) => languageServices.changeDocument(doc)));
+ipcMain.handle("lsp:close", languageHandler((doc) => languageServices.closeDocument(doc)));
+ipcMain.handle("lsp:request", languageHandler(async (request) => ({
+  ok: true,
+  result: await languageServices.request(request),
+})));
+ipcMain.handle("lsp:resolve", languageHandler((uri) => languageServices.resolveUri(uri)));
+ipcMain.handle("lsp:status", (e) => (trustedRenderer(e) ? languageServices.status() : []));
 
 // ---------------------------------------------------------------- realtime watcher
 let watcher = null;
@@ -320,6 +405,7 @@ function startWatcher() {
 async function setWorkspace(dir) {
   workspace = dir;
   store.__workspace = dir; writeJson(STORE_FILE, store);
+  await languageServices.setWorkspace(dir);
   startWatcher();
   if (win && !win.isDestroyed()) {
     win.webContents.send("app:workspace", workspace);
@@ -340,6 +426,11 @@ ipcMain.handle("app:restart-bridge", async (e) => {
   return core.restart(mcpConfig());
 });
 ipcMain.handle("app:bridge-status", (e) => (trustedRenderer(e) ? { alive: core.mcpAlive(), tools: core.catalog.length } : { alive: false, tools: 0 }));
+ipcMain.handle("app:open-docs", async (e) => {
+  if (!trustedRenderer(e)) return false;
+  await shell.openExternal("https://github.com/herdodp/codeknife-ADE#readme");
+  return true;
+});
 
 // ---------------------------------------------------------------- AI panel
 function applyAiBounds() {
@@ -372,24 +463,64 @@ function buildMenu() {
       { label: "Save All", accelerator: "CmdOrCtrl+Alt+S", click: () => sendAction("save-all") },
       { label: "Close Tab", accelerator: "CmdOrCtrl+W", click: () => sendAction("close-tab") },
       { type: "separator" },
+      { label: "Preferences", submenu: [
+        { label: "Settings", accelerator: "CmdOrCtrl+,", click: () => sendAction("settings") },
+        { label: "Keyboard Shortcuts", click: () => sendAction("settings-shortcuts") },
+      ] },
+      { type: "separator" },
       { role: "quit" },
     ] },
     { label: "Edit", submenu: [
       { label: "Undo", accelerator: "CmdOrCtrl+Z", click: () => sendAction("undo") },
       { label: "Redo", accelerator: "CmdOrCtrl+Shift+Z", click: () => sendAction("redo") },
       { type: "separator" },
+      { role: "cut" }, { role: "copy" }, { role: "paste" },
+      { type: "separator" },
       { label: "Find", accelerator: "CmdOrCtrl+F", click: () => sendAction("find") },
       { label: "Replace", accelerator: "CmdOrCtrl+H", click: () => sendAction("replace") },
-      { label: "Command Palette", accelerator: "F1", click: () => sendAction("palette") },
+    ] },
+    { label: "Selection", submenu: [
+      { label: "Select All", accelerator: "CmdOrCtrl+A", click: () => sendAction("select-all") },
+      { label: "Expand Selection", click: () => sendAction("expand-selection") },
+      { label: "Shrink Selection", click: () => sendAction("shrink-selection") },
     ] },
     { label: "View", submenu: [
       { label: "Toggle Explorer", accelerator: "CmdOrCtrl+B", click: () => sendAction("toggle-explorer") },
       { label: "Toggle AI Assistant", accelerator: "CmdOrCtrl+Shift+A", click: () => sendAction("toggle-ai") },
       { label: "Toggle Terminal", accelerator: "CmdOrCtrl+`", click: () => sendAction("toggle-terminal") },
-      { label: "Restart Bridge", click: () => sendAction("restart-bridge") },
       { type: "separator" },
+      { label: "Appearance", submenu: [
+        { label: "Dark Theme", click: () => sendAction("theme-dark") },
+        { label: "Light Theme", click: () => sendAction("theme-light") },
+        { label: "Toggle Status Bar", click: () => sendAction("toggle-status") },
+      ] },
+      { label: "Command Palette", accelerator: "F1", click: () => sendAction("palette") },
+      { type: "separator" },
+      { label: "Restart MCP Bridge", click: () => sendAction("restart-bridge") },
       { role: "reload" }, { role: "toggleDevTools" }, { role: "togglefullscreen" },
       { role: "zoomIn" }, { role: "zoomOut" }, { role: "resetZoom" },
+    ] },
+    { label: "Go", submenu: [
+      { label: "Go to Line...", accelerator: "CmdOrCtrl+G", click: () => sendAction("go-line") },
+      { label: "Go to Definition", accelerator: "F12", click: () => sendAction("go-definition") },
+      { type: "separator" },
+      { label: "Next Editor", accelerator: "CmdOrCtrl+Tab", click: () => sendAction("next-tab") },
+      { label: "Previous Editor", accelerator: "CmdOrCtrl+Shift+Tab", click: () => sendAction("previous-tab") },
+    ] },
+    { label: "Run", submenu: [
+      { label: "Run Active File", accelerator: "CmdOrCtrl+F5", click: () => sendAction("run-file") },
+      { label: "Stop Running Command", click: () => sendAction("stop-command") },
+    ] },
+    { label: "Terminal", submenu: [
+      { label: "Toggle Terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendAction("toggle-terminal") },
+      { label: "Clear", click: () => sendAction("clear-terminal") },
+      { label: "Stop Running Command", click: () => sendAction("stop-command") },
+    ] },
+    { label: "Help", submenu: [
+      { label: "Keyboard Shortcuts", click: () => sendAction("settings-shortcuts") },
+      { label: "Documentation", click: () => shell.openExternal("https://github.com/herdodp/codeknife-ADE#readme") },
+      { type: "separator" },
+      { label: "About Codeknife", click: () => sendAction("settings-about") },
     ] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -456,9 +587,15 @@ function createWindow() {
 app.whenReady().then(() => {
   buildMenu();
   createWindow();
+  languageServices.setWorkspace(workspace).catch((error) => logLine("language services workspace setup failed: " + error));
   startWatcher();
   core.start(mcpConfig()).then(broadcastStatus);
 });
 
-app.on("before-quit", () => { stopWatcher(); termKill(); core.stop(); });
+app.on("before-quit", () => {
+  stopWatcher();
+  closeTerminal();
+  languageServices.dispose().catch((error) => logLine("language services shutdown failed: " + error));
+  core.stop();
+});
 app.on("window-all-closed", () => app.quit());

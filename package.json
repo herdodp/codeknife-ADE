@@ -1,17 +1,24 @@
 {
   "name": "codeknife",
-  "version": "0.2.0",
-  "description": "Codeknife - Agentic Development Environment (ADE): Monaco editor + workspace tree + built-in Snapgent AI assistant and bridge",
+  "version": "0.3.0",
+  "description": "Codeknife ADE: Monaco editor, interactive terminal, language services, and built-in Snapgent AI assistant",
   "main": "src/main.js",
   "license": "GPL-3.0-or-later",
   "private": true,
   "scripts": {
+    "postinstall": "electron-builder install-app-deps",
     "start": "electron .",
-    "test": "node --test test/*.test.js",
+    "test": "node --test test/*.test.js && npm run test:pty",
+    "test:pty": "node test/run-pty-smoke.js",
     "dist": "electron-builder --win"
   },
   "dependencies": {
-    "monaco-editor": "^0.52.0"
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "monaco-editor": "^0.52.0",
+    "node-pty": "^1.1.0",
+    "pyright": "^1.1.414",
+    "vscode-jsonrpc": "^10.0.0"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -21,12 +28,40 @@
     "appId": "com.snapgate.codeknife",
     "productName": "Codeknife",
     "icon": "icon.ico",
-    "files": ["src/**/*", "renderer/**/*", "extension/**/*", "package.json", "icon.png"],
-    "extraResources": [
-      { "from": "bin", "to": "bin", "filter": ["vscode_mcp.exe"] }
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "extension/**/*",
+      "package.json",
+      "icon.png"
     ],
-    "win": { "target": ["nsis", "portable"], "icon": "icon.ico" },
-    "portable": { "artifactName": "Codeknife-${version}-portable.exe" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "asarUnpack": [
+      "node_modules/node-pty/**",
+      "node_modules/pyright/**"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "vscode_mcp.exe"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.ico"
+    },
+    "portable": {
+      "artifactName": "Codeknife-${version}-portable.exe"
+    },
+    "nsis": {
+      "artifactName": "Codeknife.Setup.${version}.exe",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
