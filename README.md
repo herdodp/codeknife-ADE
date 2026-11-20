@@ -10,7 +10,7 @@
 <br/>
 
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![Version](https://img.shields.io/badge/Version-0.1.0-8A2BE2?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.2.0-8A2BE2?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL--3.0-2EA44F?style=for-the-badge)
 
 [Download](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [Quick Start](#quick-start-in-4-steps) &nbsp;|&nbsp; [Example Prompts](#example-prompts) &nbsp;|&nbsp; [FAQ](#faq)
@@ -77,8 +77,8 @@ Ask the AI to open files, read code, fix bugs, or create new files. The results 
 ### Step 1. Download and install
 Go to the **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)** page and pick one of two options:
 
-- **Installer** (`Codeknife.Setup.0.1.0.exe`): run it like any other Windows app.
-- **Portable** (`Codeknife-0.1.0-win-portable.zip`): extract the zip anywhere and run `Codeknife.exe`. No installation needed.
+- **Installer** (`Codeknife Setup 0.2.0.exe`): run it like any other Windows app.
+- **Portable** (`Codeknife-0.2.0-portable.exe`): run it directly. No installation needed.
 
 ### Step 2. Open your project folder
 Press **`Ctrl + O`** and choose your project folder. Its contents will appear in the left panel.
@@ -103,6 +103,7 @@ In the right panel, choose the AI service you like and sign in with your account
 </details>
 
 Qwen Chat (`chat.qwen.ai`) and Qwen Coder (`coder.qwen.ai`) are separate integrations.
+Codeknife's in-process MCP BridgeCore communicates with MCP servers over stdio, handles large responses, limits concurrent requests, and retries failed servers with backoff. The separate Snapgent Connector WebSocket bridge is not required.
 
 ### Step 4. Press **Start**
 When the Start button in the AI panel is active and says *Ready*, press it. The AI connects to your project and is ready for your requests.
