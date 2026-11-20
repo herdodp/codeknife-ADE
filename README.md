@@ -11,7 +11,7 @@
 
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
 ![Version](https://img.shields.io/badge/Version-0.3.0-8A2BE2?style=for-the-badge)
-![License](https://img.shields.io/badge/License-GPL--3.0-2EA44F?style=for-the-badge)
+![License](https://img.shields.io/badge/License-GPL--3.0--or--later-2EA44F?style=for-the-badge)
 
 [Download](https://github.com/herdodp/codeknife-ADE/releases/latest) &nbsp;|&nbsp; [Quick Start](#quick-start-in-4-steps) &nbsp;|&nbsp; [Example Prompts](#example-prompts) &nbsp;|&nbsp; [FAQ](#faq)
 
@@ -201,7 +201,7 @@ Found a problem or have an idea? Please open an [Issue](https://github.com/herdo
 
 ## :scroll: License
 
-Codeknife is released under the **GNU GPL-3.0** license.
+Codeknife is licensed under the [GNU General Public License, version 3 or (at your option) any later version](./LICENSE).
 
 <div align="center">
 
