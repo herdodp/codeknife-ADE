@@ -77,7 +77,7 @@ Ask the AI to open files, read code, fix bugs, or create new files. The results 
 ### Step 1. Download and install
 Go to the **[Releases](https://github.com/herdodp/codeknife-ADE/releases/latest)** page and pick one of two options:
 
-- **Installer** (`Codeknife Setup 0.2.0.exe`): run it like any other Windows app.
+- **Installer** (`Codeknife.Setup.0.2.0.exe`): run it like any other Windows app.
 - **Portable** (`Codeknife-0.2.0-portable.exe`): run it directly. No installation needed.
 
 ### Step 2. Open your project folder
